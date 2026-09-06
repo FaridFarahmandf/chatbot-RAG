@@ -1,0 +1,25 @@
+# --- Core RAG stack ---
+langchain==0.3.7
+langchain-community==0.3.7
+langchain-huggingface==0.1.2
+langchain-chroma==0.1.4
+langchain-text-splitters==0.3.2
+
+# --- Vector store & embeddings (all run locally, free) ---
+chromadb==0.5.20
+sentence-transformers==3.3.1
+
+# --- LLM backends ---
+# Local, fully free Llama via Ollama:
+langchain-ollama==0.2.1
+# Optional free cloud backend (Groq's free tier serves Llama very fast):
+langchain-groq==0.2.1
+
+# --- Document loading ---
+pypdf==5.1.0
+
+# --- Web UI ---
+streamlit==1.40.2
+
+# --- Config ---
+python-dotenv==1.0.1
