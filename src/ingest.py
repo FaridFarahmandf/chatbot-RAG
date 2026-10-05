@@ -13,7 +13,6 @@ Run directly to (re)build the index:
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from langchain_community.document_loaders import (
@@ -24,7 +23,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from .config import config
-from .vector_store import get_embeddings, build_vector_store
+from .vector_store import get_embeddings, build_vector_store, delete_vector_store
 
 # File extensions we know how to load.
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
@@ -92,7 +91,7 @@ def ingest(rebuild: bool = True) -> int:
 
     if rebuild and config.vector_store_dir.exists():
         print("Removing previous vector store...")
-        shutil.rmtree(config.vector_store_dir)
+        delete_vector_store()
 
     documents = load_documents(config.data_dir)
     print(f"Loaded {len(documents)} document section(s). Splitting into chunks...")
