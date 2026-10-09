@@ -14,6 +14,7 @@ chain) so the mechanics are easy to read and explain.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from langchain_core.documents import Document
@@ -23,12 +24,18 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from .config import config
 from .vector_store import load_vector_store
 
-SYSTEM_PROMPT = """You are a helpful assistant that answers questions using \
+# Exact sentence the model is told to use when the context has no answer.
+# `ask` looks for it to know that no source backed the reply.
+REFUSAL = "I don't have enough information in the provided documents to answer that."
+
+SYSTEM_PROMPT = f"""You are a helpful assistant that answers questions using \
 ONLY the provided context. Follow these rules strictly:
 
 - Base your answer solely on the context below. Do not use outside knowledge.
-- If the context does not contain the answer, say: "I don't have enough \
-information in the provided documents to answer that."
+- The context is a list of numbered passages. After every claim, cite the \
+passage it came from using its number in square brackets, e.g. [1] or [2][3].
+- If the context does not contain the answer, reply with exactly this \
+sentence and nothing else: "{REFUSAL}"
 - Be concise and accurate. When useful, quote or reference the relevant part.
 - Do not invent facts, sources, or numbers.
 """
@@ -46,7 +53,8 @@ class RAGResult:
     """An answer plus the source documents that grounded it."""
 
     answer: str
-    sources: list[Document]
+    # Only the passages the answer actually cites, keyed by citation number.
+    sources: dict[int, Document]
 
 
 def _build_llm() -> BaseChatModel:
@@ -93,6 +101,24 @@ def _format_context(docs: list[Document]) -> str:
     return "\n\n".join(blocks)
 
 
+def _cited_sources(answer: str, docs: list[Document]) -> dict[int, Document]:
+    """Return the retrieved chunks the answer cites, keyed by their number.
+
+    The retriever always returns `top_k` chunks, relevant or not, so only the
+    ones the model referenced count as sources. A refusal has none.
+    """
+    if REFUSAL.rstrip(".").lower() in answer.lower():
+        return {}
+
+    cited: dict[int, Document] = {}
+    # Matches [1] as well as grouped citations like [1, 3].
+    for group in re.findall(r"\[(\d+(?:\s*,\s*\d+)*)\]", answer):
+        for number in map(int, re.split(r"\s*,\s*", group)):
+            if 1 <= number <= len(docs):
+                cited[number] = docs[number - 1]
+    return dict(sorted(cited.items()))
+
+
 class RAGChatbot:
     """A small, reusable RAG chatbot object."""
 
@@ -119,9 +145,10 @@ class RAGChatbot:
         ]
         response = self.llm.invoke(messages)
         answer = response.content if hasattr(response, "content") else str(response)
+        answer = answer.strip()
 
-        # 4. Return answer + sources.
-        return RAGResult(answer=answer.strip(), sources=docs)
+        # 4. Return the answer + only the sources it cites.
+        return RAGResult(answer=answer, sources=_cited_sources(answer, docs))
 
 
 if __name__ == "__main__":
@@ -136,7 +163,8 @@ if __name__ == "__main__":
             result = bot.ask(q)
             print(f"\nBot: {result.answer}\n")
             srcs = ", ".join(sorted({d.metadata.get('source', '?')
-                                     for d in result.sources}))
-            print(f"(sources: {srcs})\n")
+                                     for d in result.sources.values()}))
+            if srcs:
+                print(f"(sources: {srcs})\n")
     except (KeyboardInterrupt, EOFError):
         print("\nBye!")

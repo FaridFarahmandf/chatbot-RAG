@@ -118,8 +118,8 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
         if msg.get("sources"):
             with st.expander("📎 Sources"):
-                for i, src in enumerate(msg["sources"], start=1):
-                    st.markdown(f"**{i}. {src['source']}**")
+                for src in msg["sources"]:
+                    st.markdown(f"**[{src['number']}] {src['source']}**")
                     st.caption(src["preview"])
 
 # Chat input.
@@ -144,16 +144,17 @@ if prompt:
 
                     sources = [
                         {
+                            "number": n,
                             "source": d.metadata.get("source", "unknown"),
                             "preview": d.page_content[:300].replace("\n", " ")
                             + "...",
                         }
-                        for d in result.sources
+                        for n, d in result.sources.items()
                     ]
                     if sources:
                         with st.expander("📎 Sources"):
-                            for i, src in enumerate(sources, start=1):
-                                st.markdown(f"**{i}. {src['source']}**")
+                            for src in sources:
+                                st.markdown(f"**[{src['number']}] {src['source']}**")
                                 st.caption(src["preview"])
 
                     st.session_state.messages.append(

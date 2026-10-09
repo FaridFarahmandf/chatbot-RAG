@@ -1,0 +1,83 @@
+[
+  {
+    "id": "unrelated-geography",
+    "question": "What is the capital of Mongolia?",
+    "refusal": true
+  },
+  {
+    "id": "unrelated-cooking",
+    "question": "How do I bake sourdough bread?",
+    "refusal": true
+  },
+  {
+    "id": "unrelated-refund",
+    "question": "What is the refund policy?",
+    "refusal": true
+  },
+  {
+    "id": "united-stadium",
+    "question": "What stadium do Manchester United play in?",
+    "keywords": ["Old Trafford"],
+    "sources": ["manchester-united.md"]
+  },
+  {
+    "id": "united-head-coach",
+    "question": "Who is Manchester United's manager?",
+    "keywords": ["Carrick"],
+    "sources": ["manchester-united.md"]
+  },
+  {
+    "id": "united-founded",
+    "question": "When was Manchester United founded?",
+    "keywords": ["1878"],
+    "sources": ["manchester-united.md"]
+  },
+  {
+    "id": "batman-identity",
+    "question": "Who is Batman?",
+    "keywords": ["Bruce Wayne"],
+    "sources": ["sample_knowledge_base.md"]
+  },
+  {
+    "id": "multi-chunk-carrick",
+    "question": "Who is Manchester United's current head coach, how did he get the job, and how has the 2026-27 season started?",
+    "keywords": ["Carrick", "Amorim", "12th"],
+    "sources": ["manchester-united.md"],
+    "min_sources": 2
+  },
+  {
+    "id": "multi-chunk-eras",
+    "question": "Compare the Busby era and the Ferguson era at Manchester United.",
+    "keywords": ["Busby", "Ferguson", "13"],
+    "sources": ["manchester-united.md"],
+    "min_sources": 2
+  },
+  {
+    "id": "cross-topic",
+    "question": "Who is Batman and who is Manchester United's head coach?",
+    "keywords": ["Bruce Wayne", "Carrick"],
+    "sources": ["sample_knowledge_base.md", "manchester-united.md"],
+    "min_sources": 2
+  },
+  {
+    "id": "memory-joker-award",
+    "history": ["Who plays the Joker in The Dark Knight?"],
+    "question": "Did he win an award for it?",
+    "keywords": ["Academy Award"],
+    "sources": ["sample_knowledge_base.md"]
+  },
+  {
+    "id": "memory-the-batman-earnings",
+    "history": ["Who directed The Batman (2022)?"],
+    "question": "How much did it earn worldwide?",
+    "keywords": ["772"],
+    "sources": ["sample_knowledge_base.md"]
+  },
+  {
+    "id": "memory-carrick-predecessor",
+    "history": ["Who is Manchester United's head coach?"],
+    "question": "Who did he replace?",
+    "keywords": ["Amorim"],
+    "sources": ["manchester-united.md"]
+  }
+]
