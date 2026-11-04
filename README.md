@@ -16,9 +16,15 @@ Built with Python, LangChain, ChromaDB, sentence-transformers, and Streamlit.
   questions about them.
 - **100% free LLM** — uses Llama 3.1 (8B) via Ollama locally, or Groq's free
   API. No OpenAI key required.
-- **Grounded answers with citations** — each answer shows the exact source
-  passages it was built from, and refuses to answer when the documents don't
-  contain the information (reducing hallucinations).
+- **Grounded answers with citations** — the model cites numbered passages
+  (`[1]`, `[2]`) and the UI shows only the passages the answer actually cites.
+  When the documents don't contain the answer, it says so and shows no sources.
+- **Conversation memory** — follow-ups like *"Who did he replace?"* are
+  rewritten into standalone questions using the conversation before searching.
+- **Multi-topic questions** — a question about two subjects gets a separate
+  search for each, so neither is crowded out of the context.
+- **Measured with an eval suite** — 13 test cases covering refusals, citations,
+  follow-ups and multi-topic questions, with results tracked below.
 - **Local, private embeddings** — documents are embedded on your own machine
   with `sentence-transformers`; nothing is sent to a paid embedding API.
 - **Simple web UI** — a clean Streamlit interface you can screenshot or demo.
@@ -55,7 +61,9 @@ Built with Python, LangChain, ChromaDB, sentence-transformers, and Streamlit.
 **The RAG flow:** documents are split into chunks, embedded into vectors, and
 stored in Chroma. At query time the question is embedded, the most similar
 chunks are retrieved, and those chunks are inserted into the prompt so the
-Llama model answers from your data rather than its own training.
+Llama model answers from your data rather than its own training. Before the
+search, follow-ups are made standalone and multi-topic questions get one extra
+search per topic.
 
 ---
 
@@ -68,6 +76,9 @@ rag-chatbot/
 ├── .env.example            # Configuration template
 ├── data/                   # Your documents live here (a sample is included)
 │   └── sample_knowledge_base.md
+├── evals/
+│   ├── questions.json      # Test cases with expected answers and sources
+│   └── run_eval.py         # Runs every case and reports pass/fail
 └── src/
     ├── config.py           # Loads settings from .env
     ├── ingest.py           # Load -> split -> embed -> store pipeline
@@ -158,13 +169,61 @@ sidebar) and click **Rebuild index**.
 2. **Embedding** (`src/vector_store.py`) — each chunk is turned into a vector
    using the local `all-MiniLM-L6-v2` model and stored in a persistent Chroma
    database.
-3. **Retrieval + generation** (`src/rag_engine.py`) — the question is embedded,
-   the top-k most similar chunks are retrieved, and they're stuffed into a
-   grounded prompt sent to Llama. The system prompt instructs the model to use
-   only the provided context and to admit when it doesn't know.
+3. **Query rewriting** (`src/rag_engine.py`) — if there's earlier conversation,
+   the model rewrites a follow-up into a standalone question ("Who did he
+   replace?" → "Who did Michael Carrick replace?"). If the question covers
+   several subjects, it's also split into one sub-question per subject.
+4. **Retrieval + generation** — the question (and any sub-questions) is
+   embedded, the top-k most similar chunks are retrieved, and they're stuffed
+   into a grounded prompt sent to Llama as numbered passages. The system prompt
+   instructs the model to use only the provided context, cite passage numbers,
+   and admit when it doesn't know.
+5. **Citation filtering** — the passage numbers in the answer decide which
+   sources the UI shows, so uncited chunks never appear as "sources".
 
 Everything is configurable through `.env`: which model, chunk size, overlap,
 and how many chunks to retrieve (`TOP_K`).
+
+---
+
+## 📊 Evaluation
+
+`evals/questions.json` holds 13 test cases. Each one states what a correct
+reply must contain: required keywords, which files must be cited, how many
+passages, or that the bot must refuse. Two-turn cases list an earlier question
+in `history`, which is asked first so the follow-up sees the bot's real answer.
+Checks are plain string matching, so results are repeatable.
+
+```bash
+python -m evals.run_eval
+```
+
+Each change was measured with the local `llama3.1:8b` model:
+
+| Change | Eval score |
+|---|---|
+| Baseline (citations, no memory) | 9/13 |
+| + query rewriting for follow-ups | 12/13 |
+| + one search per subject for multi-topic questions | 13/13 |
+
+The eval also caught a bad design: a first version that rewrote and split
+questions in a single prompt dropped the score to 9–10/13. It over-split simple
+questions and reversed the meaning of a follow-up, so the two steps were
+separated again.
+
+### Known limitations
+
+- **Small test set.** 13 cases show that each feature works, not how often it
+  works on real traffic.
+- **Missing facts are caught, invented ones aren't.** Keyword checks confirm
+  the right facts appear, but a wrong extra claim in an otherwise correct
+  answer still passes.
+- **Loose citations.** The 8B model sometimes groups all citation numbers at
+  the end of an answer or cites a passage it didn't need.
+- **Vague questions on a new topic** can be pulled toward the previous topic,
+  e.g. "What stadium do *they* play in?" right after a question about the Joker.
+- **Extra latency.** Follow-ups, and questions containing "and" or several
+  question marks, each cost one extra model call before the search.
 
 ---
 
@@ -195,8 +254,10 @@ sentence-transformers · Streamlit**
 > questions over a custom document set using an open-source Llama 3.1 model.
 > Implemented the full pipeline — document chunking, local vector embeddings
 > (sentence-transformers), semantic retrieval with ChromaDB, and grounded
-> prompt construction — and exposed it through a Streamlit UI with source
-> citations and hallucination guarding.
+> prompt construction — plus conversation memory via query rewriting,
+> per-topic retrieval for multi-part questions, and citation-filtered sources.
+> Built a 13-case evaluation suite and used it to raise the pass rate from
+> 9/13 to 13/13.
 
 ---
 

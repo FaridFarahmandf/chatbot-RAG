@@ -4,6 +4,7 @@ The RAG engine: ties retrieval and generation together.
 Given a user question, it:
   0. If there is earlier conversation, rewrites a follow-up ("Who did he
      replace?") into a standalone question so retrieval knows what it's about.
+     A question about several subjects also gets one extra search per subject.
   1. Embeds the question and retrieves the most relevant chunks from Chroma.
   2. Builds a prompt that grounds the LLM in ONLY those retrieved chunks.
   3. Calls the Llama model (via Ollama locally, or Groq's free cloud API).
@@ -34,8 +35,10 @@ SYSTEM_PROMPT = f"""You are a helpful assistant that answers questions using \
 ONLY the provided context. Follow these rules strictly:
 
 - Base your answer solely on the context below. Do not use outside knowledge.
-- The context is a list of numbered passages. After every claim, cite the \
-passage it came from using its number in square brackets, e.g. [1] or [2][3].
+- The context is a list of numbered passages. Cite the passage each claim \
+came from using its number in square brackets, e.g. [1] or [2][3].
+- Put the citation right after each item or sentence, not grouped at the end.
+- Don't list the same item twice; merge what different passages say about it.
 - If the context does not contain the answer, reply with exactly this \
 sentence and nothing else: "{REFUSAL}"
 - Be concise and accurate. When useful, quote or reference the relevant part.
@@ -63,8 +66,18 @@ Follow-up question: {question}
 
 Standalone question:"""
 
+SPLIT_PROMPT = """Does this question ask about two or more unrelated \
+subjects (for example a film and a football club)? If so, write one short \
+question per subject, one per line, each ending with "?". If it is about a \
+single subject, reply with only the word NONE. Do not answer it.
+
+Question: {question}"""
+
 # How many earlier messages (user + assistant) to use when rewriting.
 MAX_HISTORY = 6
+
+# Extra searches for a multi-subject question, in case the model over-splits.
+MAX_SUBQUESTIONS = 3
 
 
 @dataclass
@@ -74,9 +87,9 @@ class RAGResult:
     answer: str
     # Only the passages the answer actually cites, keyed by citation number.
     sources: dict[int, Document]
-    # The question actually searched and answered: the user's question,
-    # rewritten to stand on its own when there was earlier conversation.
-    search_query: str
+    # What was searched: the question made standalone, followed by one
+    # sub-question per subject when it covered several.
+    search_queries: list[str]
 
 
 def _build_llm() -> BaseChatModel:
@@ -168,6 +181,44 @@ class RAGChatbot:
         rewritten = re.sub(r"^standalone question:\s*", "", lines[0], flags=re.I)
         return rewritten.strip('"\'') or question
 
+    def _split(self, question: str) -> list[str]:
+        """One sub-question per subject, or [] if it's about a single subject."""
+        # Only "and" or several question marks can join subjects; skip the
+        # extra model call for everything else.
+        if " and " not in question.lower() and question.count("?") < 2:
+            return []
+        response = self.llm.invoke(
+            [HumanMessage(content=SPLIT_PROMPT.format(question=question))]
+        )
+        # Keep only lines that are questions, which drops any chatter.
+        subquestions = []
+        for line in response.content.splitlines():
+            line = re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", line).strip().strip('"\'')
+            if line.endswith("?"):
+                subquestions.append(line)
+        return subquestions[:MAX_SUBQUESTIONS] if len(subquestions) > 1 else []
+
+    def _retrieve(self, query: str, subquestions: list[str]) -> list[Document]:
+        """Top chunks for the query, balanced across subjects if it has several."""
+        if not subquestions:
+            return self.retriever.invoke(query)
+
+        # Every subject's best hits first, so no subject is crowded out, then
+        # the whole question's own hits; capped at twice the usual context.
+        results = [self.retriever.invoke(q) for q in subquestions]
+        ranked = [hits[rank] for rank in range(config.top_k)
+                  for hits in results if rank < len(hits)]
+        ranked += self.retriever.invoke(query)
+
+        docs: list[Document] = []
+        seen: set[tuple[str, str]] = set()
+        for doc in ranked:
+            key = (doc.metadata.get("source", ""), doc.page_content)
+            if key not in seen and len(docs) < 2 * config.top_k:
+                seen.add(key)
+                docs.append(doc)
+        return docs
+
     def ask(self, question: str, history: list[dict] | None = None) -> RAGResult:
         """Answer a question with retrieval-augmented generation.
 
@@ -175,11 +226,13 @@ class RAGChatbot:
         {"role": "user" | "assistant", "content": ...} messages. It's used only
         to resolve what a follow-up refers to.
         """
-        # 0. Make follow-ups standalone so retrieval can find the right chunks.
+        # 0. Make follow-ups standalone so retrieval can find the right chunks,
+        #    and give each subject of a multi-subject question its own search.
         query = self._rewrite(question, history) if history else question
+        subquestions = self._split(query)
 
         # 1. Retrieve relevant chunks.
-        docs = self.retriever.invoke(query)
+        docs = self._retrieve(query, subquestions)
 
         # 2. Build the grounded prompt.
         context = _format_context(docs)
@@ -198,7 +251,7 @@ class RAGChatbot:
         return RAGResult(
             answer=answer,
             sources=_cited_sources(answer, docs),
-            search_query=query,
+            search_queries=[query, *subquestions],
         )
 
 

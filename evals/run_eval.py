@@ -82,8 +82,9 @@ def main() -> int:
             for turn in case.get("history", []):
                 print(f"      earlier:  {turn}")
             print(f"      question: {case['question']}")
-            if result.search_query != case["question"]:
-                print(f"      rewritten: {result.search_query}")
+            if result.search_queries != [case["question"]]:
+                for query in result.search_queries:
+                    print(f"      searched: {query}")
             print(f"      answer:   {' '.join(result.answer.split())[:200]}")
             for problem in problems:
                 print(f"      - {problem}")

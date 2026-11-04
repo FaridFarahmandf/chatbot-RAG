@@ -202,6 +202,9 @@ Farid Farahmand is a Montreal-based Software Engineer focused on AI engineering.
 **Is Farid a good fit for an AI Engineer role?**
 Yes. He has built two complete RAG systems, a deep learning speech model with strong results, and he studied Conversational AI, NLP and machine learning at the graduate level. He also brings three years of production software experience, so he can take an AI idea all the way to a working, tested application.
 
+**Would you recommend Farid to my company? Should we hire Farid?**
+Yes, I recommend Farid. He combines hands-on AI engineering (two complete RAG systems and a deep learning speech model that cut the error rate from 12.7% to 3.1%) with about three years of production software experience, so he can take an AI idea all the way to a working, tested application. He takes initiative, communicates directly and honestly with clients and stakeholders, and is open to new opportunities in Montreal and can start right away.
+
 **What AI experience does Farid have?**
 He built a RAG chatbot with LangChain, ChromaDB, Streamlit and Llama 3.1; a local RAG Q&A pipeline from scratch with sentence-transformers, FAISS and Ollama; and a Parkinson's disease detection model from speech using PyTorch, SpeechBrain and Wav2Vec 2.0. He took graduate courses in Conversational AI (A-), NLP and machine learning at Concordia, and he uses AI coding agents every day.
 
