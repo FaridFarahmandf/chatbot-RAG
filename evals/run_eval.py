@@ -10,8 +10,8 @@ against simple, deterministic expectations (no LLM judge):
   - "min_sources": n  -> the answer must cite at least n chunks.
 
 A case may also have "history": a list of earlier user questions in the same
-conversation, with "question" as the follow-up. These only pass once the
-chatbot can use conversation history.
+conversation, with "question" as the follow-up. The earlier questions are
+asked first, so the follow-up sees the bot's real earlier answers.
 
 Run with:
     python -m evals.run_eval
@@ -19,7 +19,6 @@ Run with:
 
 from __future__ import annotations
 
-import inspect
 import json
 import sys
 from pathlib import Path
@@ -28,17 +27,16 @@ from src.rag_engine import REFUSAL, RAGChatbot, RAGResult
 
 QUESTIONS_PATH = Path(__file__).resolve().parent / "questions.json"
 
-# Whether the chatbot can be given earlier turns. Until it can, follow-up
-# cases are asked on their own, exactly as the app does today.
-SUPPORTS_HISTORY = "history" in inspect.signature(RAGChatbot.ask).parameters
-
-
 def ask(bot: RAGChatbot, case: dict) -> RAGResult:
-    """Ask the case's question, passing earlier turns when the bot takes them."""
-    history = case.get("history")
-    if history and SUPPORTS_HISTORY:
-        return bot.ask(case["question"], history=history)
-    return bot.ask(case["question"])
+    """Ask the case's question after playing out any earlier turns."""
+    history: list[dict] = []
+    for earlier in case.get("history", []):
+        reply = bot.ask(earlier, history=history)
+        history += [
+            {"role": "user", "content": earlier},
+            {"role": "assistant", "content": reply.answer},
+        ]
+    return bot.ask(case["question"], history=history)
 
 
 def check(case: dict, result: RAGResult) -> list[str]:
@@ -84,14 +82,13 @@ def main() -> int:
             for turn in case.get("history", []):
                 print(f"      earlier:  {turn}")
             print(f"      question: {case['question']}")
+            if result.search_query != case["question"]:
+                print(f"      rewritten: {result.search_query}")
             print(f"      answer:   {' '.join(result.answer.split())[:200]}")
             for problem in problems:
                 print(f"      - {problem}")
 
     print(f"\n{len(cases) - failed}/{len(cases)} passed")
-    if not SUPPORTS_HISTORY and any(case.get("history") for case in cases):
-        print("Note: follow-up cases ran without their history "
-              "(RAGChatbot.ask has no `history` parameter yet).")
     return 1 if failed else 0
 
 

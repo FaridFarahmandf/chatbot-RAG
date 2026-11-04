@@ -2,6 +2,8 @@
 The RAG engine: ties retrieval and generation together.
 
 Given a user question, it:
+  0. If there is earlier conversation, rewrites a follow-up ("Who did he
+     replace?") into a standalone question so retrieval knows what it's about.
   1. Embeds the question and retrieves the most relevant chunks from Chroma.
   2. Builds a prompt that grounds the LLM in ONLY those retrieved chunks.
   3. Calls the Llama model (via Ollama locally, or Groq's free cloud API).
@@ -47,6 +49,23 @@ Question: {question}
 
 Answer:"""
 
+REWRITE_PROMPT = """Rewrite the follow-up question so it can be understood \
+without the conversation. Replace pronouns and vague references ("he", "it", \
+"that film") with what they refer to in the conversation. Use only the \
+conversation, never outside knowledge. If the follow-up is already \
+self-contained, return it unchanged. Do not answer it.
+Reply with only the rewritten question.
+
+Conversation:
+{history}
+
+Follow-up question: {question}
+
+Standalone question:"""
+
+# How many earlier messages (user + assistant) to use when rewriting.
+MAX_HISTORY = 6
+
 
 @dataclass
 class RAGResult:
@@ -55,6 +74,9 @@ class RAGResult:
     answer: str
     # Only the passages the answer actually cites, keyed by citation number.
     sources: dict[int, Document]
+    # The question actually searched and answered: the user's question,
+    # rewritten to stand on its own when there was earlier conversation.
+    search_query: str
 
 
 def _build_llm() -> BaseChatModel:
@@ -129,14 +151,39 @@ class RAGChatbot:
         )
         self.llm = _build_llm()
 
-    def ask(self, question: str) -> RAGResult:
-        """Answer a single question with retrieval-augmented generation."""
+    def _rewrite(self, question: str, history: list[dict]) -> str:
+        """Turn a follow-up into a standalone question using the conversation."""
+        lines = []
+        for message in history[-MAX_HISTORY:]:
+            speaker = "User" if message["role"] == "user" else "Assistant"
+            # Citation markers mean nothing outside the original answer.
+            text = re.sub(r"\s*\[\d+(?:\s*,\s*\d+)*\]", "", message["content"])
+            lines.append(f"{speaker}: {text}")
+        prompt = REWRITE_PROMPT.format(history="\n".join(lines), question=question)
+        response = self.llm.invoke([HumanMessage(content=prompt)])
+        lines = [line.strip() for line in response.content.splitlines() if line.strip()]
+        if not lines:
+            return question
+        # Small models sometimes echo the label or wrap the reply in quotes.
+        rewritten = re.sub(r"^standalone question:\s*", "", lines[0], flags=re.I)
+        return rewritten.strip('"\'') or question
+
+    def ask(self, question: str, history: list[dict] | None = None) -> RAGResult:
+        """Answer a question with retrieval-augmented generation.
+
+        `history` is the earlier conversation, oldest first, as
+        {"role": "user" | "assistant", "content": ...} messages. It's used only
+        to resolve what a follow-up refers to.
+        """
+        # 0. Make follow-ups standalone so retrieval can find the right chunks.
+        query = self._rewrite(question, history) if history else question
+
         # 1. Retrieve relevant chunks.
-        docs = self.retriever.invoke(question)
+        docs = self.retriever.invoke(query)
 
         # 2. Build the grounded prompt.
         context = _format_context(docs)
-        user_prompt = PROMPT_TEMPLATE.format(context=context, question=question)
+        user_prompt = PROMPT_TEMPLATE.format(context=context, question=query)
 
         # 3. Generate the answer.
         messages = [
@@ -148,19 +195,28 @@ class RAGChatbot:
         answer = answer.strip()
 
         # 4. Return the answer + only the sources it cites.
-        return RAGResult(answer=answer, sources=_cited_sources(answer, docs))
+        return RAGResult(
+            answer=answer,
+            sources=_cited_sources(answer, docs),
+            search_query=query,
+        )
 
 
 if __name__ == "__main__":
     # Tiny CLI for quick manual testing without the web UI.
     bot = RAGChatbot()
     print("RAG chatbot ready. Ask a question (Ctrl+C to quit).\n")
+    history: list[dict] = []
     try:
         while True:
             q = input("You: ").strip()
             if not q:
                 continue
-            result = bot.ask(q)
+            result = bot.ask(q, history=history)
+            history += [
+                {"role": "user", "content": q},
+                {"role": "assistant", "content": result.answer},
+            ]
             print(f"\nBot: {result.answer}\n")
             srcs = ", ".join(sorted({d.metadata.get('source', '?')
                                      for d in result.sources.values()}))
