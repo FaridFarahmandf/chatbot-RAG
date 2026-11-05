@@ -1,8 +1,9 @@
 """
 Central configuration for the RAG chatbot.
 
-All settings are read from environment variables (loaded from a `.env` file),
-with sensible defaults so the project runs out of the box.
+All settings are read from environment variables (loaded from a `.env` file
+locally), then from Streamlit secrets (on Streamlit Community Cloud), with
+sensible defaults so the project runs out of the box.
 """
 
 import os
@@ -17,7 +18,16 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 
 def _get(name: str, default: str) -> str:
-    return os.getenv(name, default)
+    value = os.getenv(name)
+    if value is None:
+        # On Streamlit Community Cloud, settings are entered as app secrets.
+        try:
+            import streamlit as st
+
+            value = st.secrets.get(name)
+        except Exception:  # noqa: BLE001 - no secrets file, or not in Streamlit
+            value = None
+    return default if value is None else str(value)
 
 
 @dataclass
