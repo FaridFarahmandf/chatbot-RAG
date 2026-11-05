@@ -41,7 +41,6 @@ STARTER_QUESTIONS = [
         "What AI projects has Farid built?",
     ),
     ("What degree does Farid have?", "cited answer", None),
-    ("What is Farid's salary expectation?", "not in the documents", None),
 ]
 
 
