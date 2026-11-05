@@ -12,7 +12,7 @@ sentence-transformers==3.3.1
 # --- LLM backends ---
 # Local, fully free Llama via Ollama:
 langchain-ollama==0.2.1
-# Optional free cloud backend (Groq's free tier serves Llama very fast):
+# Optional free cloud backend (Groq's free tier, very fast):
 langchain-groq==0.2.1
 
 # --- Document loading ---

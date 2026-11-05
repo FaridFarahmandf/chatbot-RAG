@@ -40,9 +40,80 @@ STARTER_QUESTIONS = [
         "follow-up",
         "What AI projects has Farid built?",
     ),
-    ("What degree does Farid have and what did he do at Sarmad?", "two topics", None),
+    ("What degree does Farid have?", "cited answer", None),
     ("What is Farid's salary expectation?", "not in the documents", None),
 ]
+
+
+# Profile card at the top of the sidebar. Text colours inherit from the
+# Streamlit theme; only the accents are fixed.
+PROFILE_CARD = """
+<style>
+.profile-card {
+    text-align: center;
+    padding: 1.5rem 1rem 1.25rem;
+    border-radius: 16px;
+    border: 1px solid rgba(14, 165, 233, 0.25);
+    background: linear-gradient(160deg, #FFFFFF, rgba(255, 255, 255, 0.6));
+    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.12);
+}
+.profile-avatar {
+    width: 76px;
+    height: 76px;
+    margin: 0 auto 0.85rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #fff;
+    background: linear-gradient(135deg, #38BDF8, #0284C7);
+    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2);
+}
+.profile-name { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
+.profile-role { font-size: 0.9rem; opacity: 0.75; margin-top: 0.3rem; }
+.profile-location { font-size: 0.85rem; opacity: 0.6; margin-top: 0.2rem; }
+.profile-status {
+    display: inline-block;
+    margin-top: 0.8rem;
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    color: #0369A1;
+    background: rgba(14, 165, 233, 0.12);
+    border: 1px solid rgba(14, 165, 233, 0.35);
+}
+.profile-links { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.1rem; }
+.profile-links a {
+    display: block;
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    color: inherit !important;
+    text-decoration: none !important;
+    background: #FFFFFF;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    transition: background 0.15s, border-color 0.15s;
+}
+.profile-links a:hover {
+    color: #FFFFFF !important;
+    background: #0EA5E9;
+    border-color: #0EA5E9;
+}
+</style>
+<div class="profile-card">
+  <div class="profile-avatar">FF</div>
+  <div class="profile-name">Farid Farahmand</div>
+  <div class="profile-status">● Open to opportunities</div>
+  <div class="profile-links">
+    <a href="https://www.linkedin.com/in/farid-farahmand" target="_blank">💼 LinkedIn</a>
+    <a href="https://github.com/FaridFarahmandf" target="_blank">💻 GitHub</a>
+    <a href="mailto:faridfarahmandf2f@gmail.com">✉️ Email</a>
+  </div>
+</div>
+"""
 
 
 # --------------------------------------------------------------------------
@@ -74,10 +145,30 @@ def save_uploaded_files(uploaded_files) -> int:
     return saved
 
 
+@st.cache_resource(show_spinner="Building the knowledge base (first start only)...")
+def ensure_index() -> None:
+    """Build the index from the data folder if there isn't one.
+
+    The index isn't in git, so a deployed app starts without it, and again
+    after every restart. Cached, so it runs once per server, not per visitor.
+    """
+    if not index_exists():
+        ingest(rebuild=True)
+
+
+try:
+    ensure_index()
+except Exception as exc:  # noqa: BLE001
+    st.error(f"Could not build the knowledge base: {exc}")
+
+
 # --------------------------------------------------------------------------
 # Sidebar: configuration + document management
 # --------------------------------------------------------------------------
 with st.sidebar:
+    st.markdown(PROFILE_CARD, unsafe_allow_html=True)
+    st.divider()
+
     st.header("⚙️ Setup")
 
     backend_label = (
@@ -85,40 +176,44 @@ with st.sidebar:
         f"**Model:** `{config.ollama_model if config.llm_backend == 'ollama' else config.groq_model}`"
     )
     st.markdown(backend_label)
-    st.divider()
 
-    st.subheader("1. Add documents")
-    uploads = st.file_uploader(
-        "Upload PDF, TXT, or Markdown files",
-        type=["pdf", "txt", "md"],
-        accept_multiple_files=True,
-    )
-    if uploads:
-        if st.button("💾 Save uploaded files", use_container_width=True):
-            n = save_uploaded_files(uploads)
-            st.success(f"Saved {n} file(s) to the data folder.")
+    # Add documents / rebuild index: commented out for the deployed app, so
+    # visitors can't change the knowledge base. Uncomment to use them locally.
+    # if config.admin_tools:
+    #     st.divider()
+    #     st.subheader("1. Add documents")
+    #     uploads = st.file_uploader(
+    #         "Upload PDF, TXT, or Markdown files",
+    #         type=["pdf", "txt", "md"],
+    #         accept_multiple_files=True,
+    #     )
+    #     if uploads:
+    #         if st.button("💾 Save uploaded files", use_container_width=True):
+    #             n = save_uploaded_files(uploads)
+    #             st.success(f"Saved {n} file(s) to the data folder.")
 
-    st.subheader("2. Build the knowledge base")
-    st.caption(
-        "Embeds every document in the data folder into the vector store. "
-        "Run this after adding or changing documents."
-    )
-    if st.button("🔨 Rebuild index", use_container_width=True):
-        with st.spinner("Ingesting documents (first run downloads the "
-                        "embedding model)..."):
-            try:
-                n_chunks = ingest(rebuild=True)
-                get_bot.clear()  # drop cached bot so it reloads the new index
-                st.session_state.pop("messages", None)
-                st.success(f"Indexed {n_chunks} chunk(s). Ready to chat!")
-            except Exception as exc:  # noqa: BLE001
-                st.error(f"Ingestion failed: {exc}")
+    #     st.subheader("2. Build the knowledge base")
+    #     st.caption(
+    #         "Embeds every document in the data folder into the vector store. "
+    #         "Run this after adding or changing documents."
+    #     )
+    #     if st.button("🔨 Rebuild index", use_container_width=True):
+    #         with st.spinner("Ingesting documents (first run downloads the "
+    #                         "embedding model)..."):
+    #             try:
+    #                 n_chunks = ingest(rebuild=True)
+    #                 get_bot.clear()  # drop cached bot so it reloads the new index
+    #                 st.session_state.pop("messages", None)
+    #                 st.success(f"Indexed {n_chunks} chunk(s). Ready to chat!")
+    #             except Exception as exc:  # noqa: BLE001
+    #                 st.error(f"Ingestion failed: {exc}")
 
     st.divider()
     if index_exists():
         st.success("Knowledge base is ready.")
     else:
-        st.warning("No index yet. Add documents and click **Rebuild index**.")
+        st.warning("No index yet. Add documents to the data folder and "
+                   "rebuild the index.")
 
 
 # --------------------------------------------------------------------------

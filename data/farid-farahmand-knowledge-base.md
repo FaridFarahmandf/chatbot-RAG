@@ -30,7 +30,7 @@ This section summarizes Farid's hands-on AI work. Details for each project are i
 - Works with the full RAG pipeline: document ingestion (PDF, text, Markdown), chunking with overlap, embedding generation, vector indexing and similarity search, prompt construction with retrieved context, and LLM answer generation.
 - Focuses on trustworthy answers: both systems ground responses in retrieved passages and cite their sources, which reduces hallucinations and lets users verify answers.
 - Has worked with both local LLMs (Ollama, private and free to run) and cloud LLM APIs (Groq, faster inference), and understands the trade-offs between them in cost, speed and privacy.
-- Is currently adding conversation history (multi-turn memory) to his RAG chatbot and plans to deploy it as a live demo.
+- Added conversation history (multi-turn memory) to his RAG chatbot so it handles follow-up questions, and plans to deploy it as a live demo.
 
 **Deep learning and speech AI**
 - Built a speech-based Parkinson's disease screening model using transfer learning from pretrained speech models (Wav2Vec 2.0, X-vector, ECAPA-TDNN) with PyTorch, SpeechBrain and Hugging Face.
@@ -109,7 +109,7 @@ Notable projects and stories from this role:
 **GitHub:** github.com/FaridFarahmandf/chatbot-RAG
 **Tech:** Python, LangChain, ChromaDB, Streamlit, Llama 3.1 (via Ollama and Groq)
 
-A "chat with your documents" application. Users upload documents and ask questions, and the chatbot answers from the content of those documents, citing the source passages it used so every answer can be checked. Documents are split into chunks, embedded and stored in a ChromaDB vector database, and LangChain handles retrieval and passes the most relevant passages to the LLM. Users can switch between a local LLM through Ollama (private, no API costs) and a cloud LLM through Groq (faster responses). Farid is currently adding conversation history so the chatbot can handle follow-up questions, and he plans to deploy it as a live demo. This chatbot is part of his portfolio.
+A "chat with your documents" application. Users upload documents and ask questions, and the chatbot answers from the content of those documents, citing the source passages it used so every answer can be checked. Documents are split into chunks, embedded and stored in a ChromaDB vector database, and LangChain handles retrieval and passes the most relevant passages to the LLM. Users can switch between a local LLM through Ollama (private, no API costs) and a cloud LLM through Groq (faster responses). Farid added conversation history so the chatbot can handle follow-up questions, and he plans to deploy it as a live demo. This chatbot is part of his portfolio.
 
 ### RAG Document Q&A (Local RAG Pipeline Built from Scratch)
 **GitHub:** github.com/FaridFarahmandf/rag-project
@@ -202,9 +202,6 @@ Farid Farahmand is a Montreal-based Software Engineer focused on AI engineering.
 **Is Farid a good fit for an AI Engineer role?**
 Yes. He has built two complete RAG systems, a deep learning speech model with strong results, and he studied Conversational AI, NLP and machine learning at the graduate level. He also brings three years of production software experience, so he can take an AI idea all the way to a working, tested application.
 
-**Would you recommend Farid to my company? Should we hire Farid?**
-Yes, I recommend Farid. He combines hands-on AI engineering (two complete RAG systems and a deep learning speech model that cut the error rate from 12.7% to 3.1%) with about three years of production software experience, so he can take an AI idea all the way to a working, tested application. He takes initiative, communicates directly and honestly with clients and stakeholders, and is open to new opportunities in Montreal and can start right away.
-
 **What AI experience does Farid have?**
 He built a RAG chatbot with LangChain, ChromaDB, Streamlit and Llama 3.1; a local RAG Q&A pipeline from scratch with sentence-transformers, FAISS and Ollama; and a Parkinson's disease detection model from speech using PyTorch, SpeechBrain and Wav2Vec 2.0. He took graduate courses in Conversational AI (A-), NLP and machine learning at Concordia, and he uses AI coding agents every day.
 
@@ -221,7 +218,7 @@ In his Parkinson's project he worked with pretrained speech models (Wav2Vec 2.0,
 His RAG Chatbot is his flagship AI project, and it is the technology behind this chatbot. The Parkinson's detection project shows his deep learning skills, and the local RAG pipeline shows he understands RAG from the ground up.
 
 **What is he working on now?**
-He is adding conversation history to his RAG chatbot so it can handle follow-up questions, and preparing to deploy it as a live demo. He is also taking an AI Engineer bootcamp.
+He is preparing to deploy his RAG chatbot as a live demo, and he is taking an AI Engineer bootcamp.
 
 **How many years of experience does Farid have?**
 About three years of professional software development (August 2020 to September 2023), followed by a Master's degree with graduate AI courses and several AI projects.
@@ -243,3 +240,6 @@ Yes, at an intermediate level, and he is actively improving it.
 
 **How can I contact Farid?**
 By email at faridfarahmandf2f@gmail.com, or on LinkedIn at linkedin.com/in/farid-farahmand. His code is on GitHub at github.com/FaridFarahmandf.
+
+**Would you recommend Farid to my company? Should we hire Farid?**
+Yes, I recommend Farid. He combines hands-on AI engineering (two complete RAG systems and a deep learning speech model that cut the error rate from 12.7% to 3.1%) with about three years of production software experience, so he can take an AI idea all the way to a working, tested application. He takes initiative, communicates directly and honestly with clients and stakeholders, and is open to new opportunities in Montreal and can start right away.

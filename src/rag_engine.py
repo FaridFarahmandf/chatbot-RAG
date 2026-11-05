@@ -66,10 +66,11 @@ Follow-up question: {question}
 
 Standalone question:"""
 
-SPLIT_PROMPT = """Does this question ask about two or more unrelated \
-subjects (for example a film and a football club)? If so, write one short \
-question per subject, one per line, each ending with "?". If it is about a \
-single subject, reply with only the word NONE. Do not answer it.
+SPLIT_PROMPT = """Does this question ask two or more separate things that need \
+different information to answer (for example a film and a football club, or \
+someone's education and their job)? If so, write one short question per \
+thing, one per line, each ending with "?". If it asks only one thing, reply \
+with only the word NONE. Do not answer it.
 
 Question: {question}"""
 

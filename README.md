@@ -233,7 +233,7 @@ separated again.
 |---|---|---|
 | `LLM_BACKEND` | `ollama` | `ollama` (local) or `groq` (free cloud) |
 | `OLLAMA_MODEL` | `llama3.1:8b` | Ollama model name |
-| `GROQ_MODEL` | `llama-3.1-8b-instant` | Groq model name |
+| `GROQ_MODEL` | `qwen/qwen3.8-27b` | Groq model name |
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Local embedder |
 | `CHUNK_SIZE` | `1000` | Characters per chunk |
 | `CHUNK_OVERLAP` | `150` | Overlap between chunks |

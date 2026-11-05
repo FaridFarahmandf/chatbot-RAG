@@ -33,7 +33,7 @@ class Config:
 
     # Groq
     groq_api_key: str = _get("GROQ_API_KEY", "")
-    groq_model: str = _get("GROQ_MODEL", "llama-3.1-8b-instant")
+    groq_model: str = _get("GROQ_MODEL", "qwen/qwen3.8-27b")
 
     # Embeddings (local, free)
     embedding_model: str = _get(
@@ -44,6 +44,11 @@ class Config:
     chunk_size: int = int(_get("CHUNK_SIZE", "1000"))
     chunk_overlap: int = int(_get("CHUNK_OVERLAP", "150"))
     top_k: int = int(_get("TOP_K", "4"))
+
+    # Show "Add documents" and "Rebuild index" in the web UI. Off by default so
+    # visitors to a deployed app can't change the knowledge base; set
+    # ADMIN_TOOLS=true in your local .env to get them back.
+    admin_tools: bool = _get("ADMIN_TOOLS", "false").lower() == "true"
 
     # Paths (resolved to absolute, relative to project root)
     data_dir: Path = PROJECT_ROOT / _get("DATA_DIR", "data")
