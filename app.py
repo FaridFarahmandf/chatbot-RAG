@@ -134,6 +134,27 @@ def get_bot():
     return RAGChatbot()
 
 
+STARTER_FOLLOWS = {question: follows for question, _, follows in STARTER_QUESTIONS}
+
+
+@st.cache_data(show_spinner=False, ttl=24 * 60 * 60)
+def starter_answer(question: str):
+    """Answer a starter question once a day and share it with every visitor.
+
+    Most visitors click the same buttons, so this keeps them from using up
+    the free tier's per-minute token limit. A follow-up starter is answered
+    as if asked right after the question it follows. Errors aren't cached.
+    """
+    follows = STARTER_FOLLOWS[question]
+    history = [{"role": "user", "content": follows}] if follows else []
+    return get_bot().ask(question, history=history)
+
+
+def is_rate_limit(exc: Exception) -> bool:
+    """True if the LLM provider rejected the call for being over its limit."""
+    return getattr(exc, "status_code", None) == 429 or "rate limit" in str(exc).lower()
+
+
 def save_uploaded_files(uploaded_files) -> int:
     """Persist uploaded files into the data directory. Returns count saved."""
     config.data_dir.mkdir(parents=True, exist_ok=True)
@@ -252,8 +273,10 @@ if prompt:
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    bot = get_bot()
-                    result = bot.ask(prompt, history=history)
+                    if prompt in STARTER_FOLLOWS:
+                        result = starter_answer(prompt)
+                    else:
+                        result = get_bot().ask(prompt, history=history)
                     st.markdown(result.answer)
 
                     sources = [
@@ -279,11 +302,28 @@ if prompt:
                         }
                     )
                 except Exception as exc:  # noqa: BLE001
-                    st.error(
-                        f"Something went wrong: {exc}\n\n"
-                        "If you're using Ollama, make sure it's running and "
-                        "the model is pulled (`ollama pull llama3.1:8b`)."
-                    )
+                    # Drop the unanswered question so it can be asked again.
+                    st.session_state.messages.pop()
+                    if is_rate_limit(exc):
+                        st.warning(
+                            "The demo is busy right now. Please try again in "
+                            "a minute."
+                        )
+                    elif config.llm_backend == "ollama":
+                        st.error(
+                            f"Something went wrong: {exc}\n\n"
+                            "Make sure Ollama is running and the model is "
+                            f"pulled (`ollama pull {config.ollama_model}`)."
+                        )
+                    else:
+                        # Provider errors can include account details, so
+                        # visitors get a generic message; the details go to
+                        # the server log.
+                        print(f"LLM error: {exc!r}")
+                        st.error(
+                            "Sorry, something went wrong. Please try again in "
+                            "a minute."
+                        )
 
 
 # Starter questions not asked yet, below the conversation.

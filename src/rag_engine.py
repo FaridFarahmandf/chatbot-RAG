@@ -80,6 +80,9 @@ MAX_HISTORY = 6
 # Extra searches for a multi-subject question, in case the model over-splits.
 MAX_SUBQUESTIONS = 3
 
+# Reply cap for the rewrite and split calls, which return a line or two.
+SMALL_CALL_MAX_TOKENS = 150
+
 
 @dataclass
 class RAGResult:
@@ -93,8 +96,12 @@ class RAGResult:
     search_queries: list[str]
 
 
-def _build_llm() -> BaseChatModel:
-    """Instantiate the chat model for the configured backend."""
+def _build_llm(max_tokens: int | None = None) -> BaseChatModel:
+    """Instantiate the chat model for the configured backend.
+
+    `max_tokens` caps the reply length (Groq only; defaults to
+    `config.max_answer_tokens`).
+    """
     backend = config.llm_backend
 
     if backend == "ollama":
@@ -117,10 +124,22 @@ def _build_llm() -> BaseChatModel:
             )
         from langchain_groq import ChatGroq
 
+        # Qwen3 can "think" before answering, and thinking tokens count
+        # against the rate limit too. Turn it off; answers come from the
+        # context, so it adds nothing here.
+        extra = {"reasoning_effort": "none"} if "qwen3" in config.groq_model else {}
+
         return ChatGroq(
             model=config.groq_model,
             api_key=config.groq_api_key,
             temperature=0.1,
+            # Without a cap, Groq reserves the model's full output limit per
+            # call and the free tier's tokens-per-minute run out after one
+            # question.
+            max_tokens=max_tokens or config.max_answer_tokens,
+            # Retries on a rate limit, waiting as long as Groq asks.
+            max_retries=3,
+            model_kwargs=extra,
         )
 
     raise ValueError(
@@ -164,6 +183,9 @@ class RAGChatbot:
             search_kwargs={"k": config.top_k}
         )
         self.llm = _build_llm()
+        # Rewriting and splitting reply with a line or two, so they get a
+        # small cap and use little of the per-minute token budget.
+        self.small_llm = _build_llm(max_tokens=SMALL_CALL_MAX_TOKENS)
 
     def _rewrite(self, question: str, history: list[dict]) -> str:
         """Turn a follow-up into a standalone question using the conversation."""
@@ -174,7 +196,7 @@ class RAGChatbot:
             text = re.sub(r"\s*\[\d+(?:\s*,\s*\d+)*\]", "", message["content"])
             lines.append(f"{speaker}: {text}")
         prompt = REWRITE_PROMPT.format(history="\n".join(lines), question=question)
-        response = self.llm.invoke([HumanMessage(content=prompt)])
+        response = self.small_llm.invoke([HumanMessage(content=prompt)])
         lines = [line.strip() for line in response.content.splitlines() if line.strip()]
         if not lines:
             return question
@@ -188,7 +210,7 @@ class RAGChatbot:
         # extra model call for everything else.
         if " and " not in question.lower() and question.count("?") < 2:
             return []
-        response = self.llm.invoke(
+        response = self.small_llm.invoke(
             [HumanMessage(content=SPLIT_PROMPT.format(question=question))]
         )
         # Keep only lines that are questions, which drops any chatter.

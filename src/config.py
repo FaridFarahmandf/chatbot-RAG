@@ -44,6 +44,10 @@ class Config:
     # Groq
     groq_api_key: str = _get("GROQ_API_KEY", "")
     groq_model: str = _get("GROQ_MODEL", "qwen/qwen3.8-27b")
+    # Cap on answer length. Groq counts this cap (not the real answer length)
+    # against the per-minute token limit, so keeping it low lets more visitors
+    # use the free tier at once. Answers are a short paragraph.
+    max_answer_tokens: int = int(_get("MAX_ANSWER_TOKENS", "500"))
 
     # Embeddings (local, free)
     embedding_model: str = _get(
